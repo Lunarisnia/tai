@@ -20,17 +20,6 @@ pub enum Color {
     White = 15,
 }
 
-#[repr(C)]
-pub struct ScreenChar {
-    pub ascii_character: u8,
-    pub color_code: ColorCode,
-}
-
-#[repr(transparent)]
-pub struct Buffer {
-    pub chars: [ScreenChar; 80],
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct ColorCode(u8);
@@ -41,3 +30,56 @@ impl ColorCode {
     }
 }
 
+const BUFFER_WIDTH: usize = 80;
+const BUFFER_HEIGHT: usize = 25;
+
+#[repr(transparent)]
+pub struct Buffer {
+    pub chars: [[ScreenChar; BUFFER_WIDTH]; BUFFER_HEIGHT],
+}
+
+#[repr(C)]
+pub struct ScreenChar {
+    ascii_character: u8,
+    color_code: ColorCode,
+}
+
+pub struct Writer {
+    column_position: usize,
+    buffer: &'static mut Buffer,
+}
+
+impl Writer {
+    pub fn new() -> Writer {
+        Writer {
+            column_position: 0,
+            buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+        }
+    }
+
+    pub fn write_byte(&mut self, byte: &u8, color: &ColorCode) {
+        let row = BUFFER_HEIGHT - 1;
+        let col = self.column_position;
+        self.buffer.chars[row][col] = ScreenChar {
+            ascii_character: *byte,
+            color_code: *color,
+        }
+    }
+}
+
+// how to do it raw
+// fn safe_print(color: ColorCode, str: &str) {
+//     // let vga_buffer = 0xb8000 as *mut u8;
+//     let vga_buffer = unsafe { &mut *(0xb8000 as *mut Buffer) };
+//
+//     // let mut last_index: isize = 0;
+//     for (i, &byte) in str.as_bytes().iter().enumerate() {
+//         vga_buffer.chars[i] = ScreenChar{
+//             ascii_character: byte,
+//             color_code: color,
+//         };
+//     }
+//     // unsafe {
+//     //     CURRENT_OFFSET = CURRENT_OFFSET + (last_index * 2);
+//     // }
+// }

@@ -16,6 +16,7 @@ mod vga_mode;
 pub extern "C" fn _start() -> ! {
     // safe_print(ColorCode::new(Color::Red, Color::Blue), "Hello, Wolrd");
     let mut writer: Writer = Writer::new();
-    writer.write_byte(&b'x', &ColorCode::new(Color::White, Color::Red));
+    writer.write_text("Hello there man\n", &ColorCode::new(Color::White, Color::Green));
+    writer.write_text("Whatchu DoiSS<Z>?_@+!)_#!SS<Z>?_@+!)_#!)SS<Z>?_@+!)/__g?i    😀", &ColorCode::new(Color::White, Color::Green));
     loop {}
 }

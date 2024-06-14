@@ -38,6 +38,7 @@ pub struct Buffer {
     pub chars: [[ScreenChar; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[repr(C)]
 pub struct ScreenChar {
     ascii_character: u8,
@@ -58,12 +59,45 @@ impl Writer {
     }
 
     pub fn write_byte(&mut self, byte: &u8, color: &ColorCode) {
-        let row = BUFFER_HEIGHT - 1;
-        let col = self.column_position;
-        self.buffer.chars[row][col] = ScreenChar {
-            ascii_character: *byte,
-            color_code: *color,
+        match byte {
+            b'\n' => self.new_line(),
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+
+                let row = BUFFER_HEIGHT - 1;
+                let col = self.column_position;
+
+                self.buffer.chars[row][col] = ScreenChar {
+                    ascii_character: *byte,
+                    color_code: *color,
+                };
+                self.column_position += 1;
+            }
         }
+    }
+
+    pub fn write_text(&mut self, text: &str, color: &ColorCode) {
+        for (_, &b) in text.as_bytes().iter().enumerate() {
+            match &b {
+                0x20..=0x7e | b'\n' => self.write_byte(&b, color),
+                &b => self.write_text("*", color),
+            }
+        }
+    }
+
+    fn new_line(&mut self) {
+        for r in 1..BUFFER_HEIGHT {
+            for c in 0..BUFFER_WIDTH {
+                self.buffer.chars[r - 1][c] = self.buffer.chars[r][c];
+            }
+        }
+        self.buffer.chars[BUFFER_HEIGHT - 1] = [ScreenChar {
+            ascii_character: 0,
+            color_code: ColorCode(0),
+        }; BUFFER_WIDTH];
+        self.column_position = 0;
     }
 }
 

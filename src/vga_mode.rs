@@ -1,3 +1,13 @@
+use core::fmt;
+use core::fmt::{Arguments, Write};
+
+use lazy_static::lazy_static;
+use spin::Mutex;
+
+lazy_static!(
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer::new(ColorCode::new(Color::Black, Color::White)));
+);
+
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -47,18 +57,20 @@ pub struct ScreenChar {
 
 pub struct Writer {
     column_position: usize,
+    color: ColorCode,
     buffer: &'static mut Buffer,
 }
 
 impl Writer {
-    pub fn new() -> Writer {
+    pub fn new(color: ColorCode) -> Writer {
         Writer {
             column_position: 0,
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+            color,
         }
     }
 
-    pub fn write_byte(&mut self, byte: &u8, color: &ColorCode) {
+    pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
             byte => {
@@ -70,19 +82,19 @@ impl Writer {
                 let col = self.column_position;
 
                 self.buffer.chars[row][col] = ScreenChar {
-                    ascii_character: *byte,
-                    color_code: *color,
+                    ascii_character: byte,
+                    color_code: self.color,
                 };
                 self.column_position += 1;
             }
         }
     }
 
-    pub fn write_text(&mut self, text: &str, color: &ColorCode) {
+    pub fn write_text(&mut self, text: &str) {
         for (_, &b) in text.as_bytes().iter().enumerate() {
             match &b {
-                0x20..=0x7e | b'\n' => self.write_byte(&b, color),
-                &b => self.write_text("*", color),
+                0x20..=0x7e | b'\n' => self.write_byte(b),
+                &_ => self.write_text("*"),
             }
         }
     }
@@ -93,12 +105,46 @@ impl Writer {
                 self.buffer.chars[r - 1][c] = self.buffer.chars[r][c];
             }
         }
-        self.buffer.chars[BUFFER_HEIGHT - 1] = [ScreenChar {
+        self.clear_line(BUFFER_HEIGHT - 1);
+        self.column_position = 0;
+    }
+
+    fn clear_line(&mut self, row: usize) {
+        self.buffer.chars[row] = [ScreenChar {
             ascii_character: 0,
             color_code: ColorCode(0),
         }; BUFFER_WIDTH];
-        self.column_position = 0;
     }
+}
+
+
+impl Write for Writer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_text(&s);
+        Ok(())
+    }
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => {{
+        $crate::vga_mode::_print(format_args!($($arg)*));
+    }};
+}
+
+#[macro_export]
+macro_rules! println {
+    () => {
+        $crate::print!("\n");
+    };
+    ($($arg:tt)*) => {
+        $crate::print!("{}\n",format_args!($($arg)*))
+    }
+}
+
+pub fn _print(args: Arguments) {
+    use core::fmt::Write;
+    WRITER.lock().write_fmt(args).unwrap()
 }
 
 // how to do it raw

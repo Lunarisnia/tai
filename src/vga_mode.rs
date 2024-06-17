@@ -111,9 +111,16 @@ impl Writer {
 
     fn clear_line(&mut self, row: usize) {
         self.buffer.chars[row] = [ScreenChar {
-            ascii_character: 0,
-            color_code: ColorCode(0),
+            ascii_character: b' ',
+            color_code: self.color,
         }; BUFFER_WIDTH];
+    }
+
+    fn clear(&mut self) {
+        self.buffer.chars = [[ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color,
+        }; BUFFER_WIDTH]; BUFFER_HEIGHT];
     }
 }
 
@@ -140,6 +147,17 @@ macro_rules! println {
     ($($arg:tt)*) => {
         $crate::print!("{}\n",format_args!($($arg)*))
     }
+}
+
+#[macro_export]
+macro_rules! clear {
+    () => {
+        $crate::vga_mode::_clear();
+    };
+}
+
+pub fn _clear() {
+    WRITER.lock().clear();
 }
 
 pub fn _print(args: Arguments) {
